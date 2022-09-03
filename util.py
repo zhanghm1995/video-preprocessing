@@ -113,9 +113,9 @@ def scheduler(data_list, fn, args):
             f.flush()
     f.close()
 
-def save(path, frames, format):
+def save(path, frames, format, fps=25):
     if format == '.mp4':
-        imageio.mimsave(path, frames)
+        imageio.mimsave(path, frames, fps=fps)
     elif format == '.png':
         if os.path.exists(path):
             print ("Warning: skiping video %s" % os.path.basename(path))

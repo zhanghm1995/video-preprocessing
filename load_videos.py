@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import imageio
 import os
+import os.path as osp
 import subprocess
 from multiprocessing import Pool
 from itertools import cycle
@@ -31,9 +32,12 @@ def run(data):
     if not os.path.exists(os.path.join(args.video_folder, video_id.split('#')[0] + '.mp4')):
        download(video_id.split('#')[0], args)
 
-    if not os.path.exists(os.path.join(args.video_folder, video_id.split('#')[0] + '.mp4')):
-       print ('Can not load video %s, broken link' % video_id.split('#')[0])
-       return 
+       if not os.path.exists(os.path.join(args.video_folder, video_id.split('#')[0] + '.mp4')):
+           print('Can not load video %s, broken link' % video_id.split('#')[0])
+           return 
+    else:
+        print(f"[WARNING] Video {video_id} has been already downloaded")
+        
     reader = imageio.get_reader(os.path.join(args.video_folder, video_id.split('#')[0] + '.mp4'))
     fps = reader.get_meta_data()['fps']
 
@@ -43,6 +47,8 @@ def run(data):
     all_chunks_dict = [{'start': df['start'].iloc[j], 'end': df['end'].iloc[j],
                         'bbox': list(map(int, df['bbox'].iloc[j].split('-'))), 'frames':[]} for j in range(df.shape[0])]
     ref_fps = df['fps'].iloc[0]
+    print(f"The {video_id} video with fps:{fps} and ref_fps:{ref_fps} ok, start processing...")
+
     ref_height = df['height'].iloc[0]
     ref_width = df['width'].iloc[0]
     partition = df['partition'].iloc[0]
@@ -69,7 +75,13 @@ def run(data):
             first_part = ""
         first_part = first_part + '#'.join(video_id.split('#')[::-1])
         path = first_part + '#' + str(entry['start']).zfill(6) + '#' + str(entry['end']).zfill(6) + '.mp4'
-        save(os.path.join(args.out_folder, partition, path), entry['frames'], args.format)
+
+        save_path = os.path.join(args.out_folder, partition, path)
+        if osp.exists(save_path):
+            print(f"[WARNING] Video {save_path} has been already saved")
+        else:
+            save_fps = 25
+            save(save_path, entry['frames'], args.format, fps=save_fps)
 
 
 if __name__ == "__main__":
@@ -95,6 +107,8 @@ if __name__ == "__main__":
 
     df = pd.read_csv(args.metadata)
     video_ids = set(df['video_id'])
+    print(f"There are {len(video_ids)} videos in the dataset")
+
     pool = Pool(processes=args.workers)
     args_list = cycle([args])
     for chunks_data in tqdm(pool.imap_unordered(run, zip(video_ids, args_list))):
